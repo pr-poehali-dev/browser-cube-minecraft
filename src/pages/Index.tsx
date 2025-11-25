@@ -112,10 +112,8 @@ export default function Index() {
       const visibleBlocks = blocks.filter(block => {
         const dx = block.x - camera.x;
         const dz = block.z - camera.z;
-        const rotDx = dx * cosY - dz * sinY;
-        const rotDz = dx * sinY + dz * cosY;
         const dist = Math.abs(dx) + Math.abs(dz);
-        return dist < 30 && rotDz > -5;
+        return dist < 30;
       });
 
       visibleBlocks.sort((a, b) => {
