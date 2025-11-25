@@ -50,7 +50,7 @@ export default function Index() {
   const [health, setHealth] = useState(10);
   const [hunger, setHunger] = useState(10);
   const [showCrafting, setShowCrafting] = useState(false);
-  const [camera, setCamera] = useState({ x: 0, y: 6, z: 0, rotY: 0, rotX: 0 });
+  const [camera, setCamera] = useState({ x: 0, y: 8, z: 0, rotY: 0, pitch: -0.3 });
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -136,7 +136,7 @@ export default function Index() {
 
         const perspective = 600 / rotDz;
         const screenX = rotDx * perspective + canvas.width / 2;
-        const screenY = -dy * perspective + canvas.height / 2;
+        const screenY = (-dy * perspective + camera.pitch * perspective * 100) + canvas.height / 2;
         const size = 40 * perspective;
 
         if (size > 1 && screenX > -size && screenX < canvas.width + size) {
@@ -235,7 +235,7 @@ export default function Index() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaused, camera.rotY]);
+  }, [isPaused]);
 
   const placeBlock = () => {
     const selectedItem = inventory[selectedSlot];
