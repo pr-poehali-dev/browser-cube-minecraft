@@ -60,37 +60,27 @@ export default function Index() {
 
   const generateWorld = () => {
     const newBlocks: Block[] = [];
-    const worldSize = 20;
+    const worldSize = 15;
     
     for (let x = -worldSize; x < worldSize; x++) {
       for (let z = -worldSize; z < worldSize; z++) {
-        const height = Math.floor(Math.sin(x * 0.1) * 2 + Math.cos(z * 0.1) * 2 + 5);
+        const height = Math.floor(Math.sin(x * 0.2) * 1.5 + Math.cos(z * 0.2) * 1.5 + 4);
         
-        for (let y = 0; y <= height; y++) {
-          if (y === height) {
-            newBlocks.push({ x, y, z, type: 'grass' });
-          } else if (y >= height - 3) {
-            newBlocks.push({ x, y, z, type: 'dirt' });
-          } else {
-            newBlocks.push({ x, y, z, type: 'stone' });
-          }
-        }
+        newBlocks.push({ x, y: height, z, type: 'grass' });
 
-        if (Math.random() > 0.95 && height > 3) {
-          for (let ty = 0; ty < 4; ty++) {
+        if (Math.random() > 0.97 && height > 2) {
+          for (let ty = 0; ty < 3; ty++) {
             newBlocks.push({ x, y: height + 1 + ty, z, type: 'wood' });
           }
-          for (let lx = -2; lx <= 2; lx++) {
-            for (let lz = -2; lz <= 2; lz++) {
-              for (let ly = 0; ly < 3; ly++) {
-                if (Math.abs(lx) + Math.abs(lz) < 4) {
-                  newBlocks.push({ 
-                    x: x + lx, 
-                    y: height + 5 + ly, 
-                    z: z + lz, 
-                    type: 'leaves' 
-                  });
-                }
+          for (let lx = -1; lx <= 1; lx++) {
+            for (let lz = -1; lz <= 1; lz++) {
+              if (lx !== 0 || lz !== 0) {
+                newBlocks.push({ 
+                  x: x + lx, 
+                  y: height + 4, 
+                  z: z + lz, 
+                  type: 'leaves' 
+                });
               }
             }
           }
@@ -112,21 +102,18 @@ export default function Index() {
       ctx.fillStyle = '#87CEEB';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      const sortedBlocks = [...blocks].sort((a, b) => {
-        const distA = Math.sqrt(
-          Math.pow(a.x - camera.x, 2) + 
-          Math.pow(a.y - camera.y, 2) + 
-          Math.pow(a.z - camera.z, 2)
-        );
-        const distB = Math.sqrt(
-          Math.pow(b.x - camera.x, 2) + 
-          Math.pow(b.y - camera.y, 2) + 
-          Math.pow(b.z - camera.z, 2)
-        );
+      const visibleBlocks = blocks.filter(block => {
+        const dist = Math.abs(block.x - camera.x) + Math.abs(block.z - camera.z);
+        return dist < 25 && block.z < camera.z + 10;
+      });
+
+      visibleBlocks.sort((a, b) => {
+        const distA = (a.z - camera.z) * 100 + (a.x - camera.x);
+        const distB = (b.z - camera.z) * 100 + (b.x - camera.x);
         return distB - distA;
       });
 
-      sortedBlocks.forEach(block => {
+      visibleBlocks.forEach(block => {
         if (block.type === 'air') return;
 
         const scale = 400 / (camera.z - block.z + 20);
@@ -134,7 +121,7 @@ export default function Index() {
         const screenY = canvas.height / 2 - (block.y - camera.y) * scale;
         const size = 20 * scale;
 
-        if (size > 0 && screenX > -size && screenX < canvas.width + size) {
+        if (size > 0.5 && screenX > -size && screenX < canvas.width + size) {
           ctx.fillStyle = blockColors[block.type];
           ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
           
