@@ -50,7 +50,7 @@ export default function Index() {
   const [health, setHealth] = useState(10);
   const [hunger, setHunger] = useState(10);
   const [showCrafting, setShowCrafting] = useState(false);
-  const [camera, setCamera] = useState({ x: 0, y: 10, z: 20, rotX: 0, rotY: 0 });
+  const [camera, setCamera] = useState({ x: 0, y: 6, z: 0, rotY: 0, rotX: 0 });
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -99,72 +99,132 @@ export default function Index() {
     if (!ctx) return;
 
     const render = () => {
-      ctx.fillStyle = '#87CEEB';
+      const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, '#87CEEB');
+      gradient.addColorStop(0.5, '#B0D9F0');
+      gradient.addColorStop(1, '#7CBD4F');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+      const cosY = Math.cos(camera.rotY);
+      const sinY = Math.sin(camera.rotY);
+
       const visibleBlocks = blocks.filter(block => {
-        const dist = Math.abs(block.x - camera.x) + Math.abs(block.z - camera.z);
-        return dist < 25 && block.z < camera.z + 10;
+        const dx = block.x - camera.x;
+        const dz = block.z - camera.z;
+        const rotDx = dx * cosY - dz * sinY;
+        const rotDz = dx * sinY + dz * cosY;
+        const dist = Math.abs(dx) + Math.abs(dz);
+        return dist < 30 && rotDz > -5;
       });
 
       visibleBlocks.sort((a, b) => {
-        const distA = (a.z - camera.z) * 100 + (a.x - camera.x);
-        const distB = (b.z - camera.z) * 100 + (b.x - camera.x);
+        const distA = Math.sqrt(Math.pow(a.x - camera.x, 2) + Math.pow(a.z - camera.z, 2));
+        const distB = Math.sqrt(Math.pow(b.x - camera.x, 2) + Math.pow(b.z - camera.z, 2));
         return distB - distA;
       });
 
       visibleBlocks.forEach(block => {
         if (block.type === 'air') return;
 
-        const scale = 400 / (camera.z - block.z + 20);
-        const screenX = (block.x - camera.x) * scale + canvas.width / 2;
-        const screenY = canvas.height / 2 - (block.y - camera.y) * scale;
-        const size = 20 * scale;
+        const dx = block.x - camera.x;
+        const dy = block.y - camera.y;
+        const dz = block.z - camera.z;
 
-        if (size > 0.5 && screenX > -size && screenX < canvas.width + size) {
-          ctx.fillStyle = blockColors[block.type];
+        const rotDx = dx * cosY - dz * sinY;
+        const rotDz = dx * sinY + dz * cosY;
+
+        if (rotDz < 0.5) return;
+
+        const perspective = 600 / rotDz;
+        const screenX = rotDx * perspective + canvas.width / 2;
+        const screenY = -dy * perspective + canvas.height / 2;
+        const size = 40 * perspective;
+
+        if (size > 1 && screenX > -size && screenX < canvas.width + size) {
+          const brightness = Math.max(0.4, 1 - rotDz / 30);
+          const color = blockColors[block.type];
+          
+          ctx.save();
+          ctx.globalAlpha = brightness;
+          
+          ctx.fillStyle = color;
           ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
           
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-          ctx.lineWidth = Math.max(1, scale * 0.5);
-          ctx.strokeRect(screenX - size / 2, screenY - size / 2, size, size);
-
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.fillStyle = adjustBrightness(color, -20);
           ctx.fillRect(screenX - size / 2, screenY + size / 2 - size * 0.2, size, size * 0.2);
+          
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+          ctx.lineWidth = Math.max(1, perspective * 0.5);
+          ctx.strokeRect(screenX - size / 2, screenY - size / 2, size, size);
+          
+          ctx.restore();
         }
       });
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.fillRect(canvas.width / 2 - 10, canvas.height / 2 - 2, 20, 4);
-      ctx.fillRect(canvas.width / 2 - 2, canvas.height / 2 - 10, 4, 20);
+      ctx.fillRect(canvas.width / 2 - 12, canvas.height / 2 - 2, 24, 4);
+      ctx.fillRect(canvas.width / 2 - 2, canvas.height / 2 - 12, 4, 24);
     };
 
     render();
   }, [blocks, camera]);
 
+  const adjustBrightness = (color: string, amount: number) => {
+    const num = parseInt(color.replace('#', ''), 16);
+    const r = Math.max(0, Math.min(255, (num >> 16) + amount));
+    const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
+    const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+  };
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isPaused) return;
       
-      const speed = 0.5;
+      const speed = 0.3;
+      const rotSpeed = 0.08;
+      
       switch (e.key.toLowerCase()) {
         case 'w':
-          setCamera(prev => ({ ...prev, z: prev.z - speed }));
+          setCamera(prev => ({
+            ...prev,
+            x: prev.x + Math.sin(prev.rotY) * speed,
+            z: prev.z + Math.cos(prev.rotY) * speed
+          }));
           break;
         case 's':
-          setCamera(prev => ({ ...prev, z: prev.z + speed }));
+          setCamera(prev => ({
+            ...prev,
+            x: prev.x - Math.sin(prev.rotY) * speed,
+            z: prev.z - Math.cos(prev.rotY) * speed
+          }));
           break;
         case 'a':
-          setCamera(prev => ({ ...prev, x: prev.x - speed }));
+          setCamera(prev => ({
+            ...prev,
+            x: prev.x - Math.cos(prev.rotY) * speed,
+            z: prev.z + Math.sin(prev.rotY) * speed
+          }));
           break;
         case 'd':
-          setCamera(prev => ({ ...prev, x: prev.x + speed }));
+          setCamera(prev => ({
+            ...prev,
+            x: prev.x + Math.cos(prev.rotY) * speed,
+            z: prev.z - Math.sin(prev.rotY) * speed
+          }));
           break;
         case ' ':
           setCamera(prev => ({ ...prev, y: prev.y + speed }));
           break;
         case 'shift':
           setCamera(prev => ({ ...prev, y: prev.y - speed }));
+          break;
+        case 'arrowleft':
+          setCamera(prev => ({ ...prev, rotY: prev.rotY + rotSpeed }));
+          break;
+        case 'arrowright':
+          setCamera(prev => ({ ...prev, rotY: prev.rotY - rotSpeed }));
           break;
         case 'e':
           setShowCrafting(prev => !prev);
@@ -177,16 +237,16 @@ export default function Index() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaused]);
+  }, [isPaused, camera.rotY]);
 
   const placeBlock = () => {
     const selectedItem = inventory[selectedSlot];
     if (!selectedItem || selectedItem.count <= 0) return;
 
     const newBlock: Block = {
-      x: Math.round(camera.x),
-      y: Math.round(camera.y - 2),
-      z: Math.round(camera.z - 5),
+      x: Math.round(camera.x + Math.sin(camera.rotY) * 3),
+      y: Math.round(camera.y),
+      z: Math.round(camera.z + Math.cos(camera.rotY) * 3),
       type: selectedItem.type
     };
 
@@ -200,13 +260,16 @@ export default function Index() {
   };
 
   const breakBlock = () => {
+    const lookX = camera.x + Math.sin(camera.rotY) * 3;
+    const lookZ = camera.z + Math.cos(camera.rotY) * 3;
+    
     const nearestBlock = blocks.find(block => {
       const dist = Math.sqrt(
-        Math.pow(block.x - camera.x, 2) +
-        Math.pow(block.y - (camera.y - 2), 2) +
-        Math.pow(block.z - (camera.z - 3), 2)
+        Math.pow(block.x - lookX, 2) +
+        Math.pow(block.y - camera.y, 2) +
+        Math.pow(block.z - lookZ, 2)
       );
-      return dist < 5;
+      return dist < 2;
     });
 
     if (nearestBlock) {
@@ -376,12 +439,12 @@ export default function Index() {
       <div className="absolute top-4 right-4 bg-black/70 p-4 rounded text-white text-xs space-y-1 z-30">
         <div className="font-bold mb-2">УПРАВЛЕНИЕ</div>
         <div>WASD - движение</div>
+        <div>← → - поворот</div>
         <div>Пробел/Shift - вверх/вниз</div>
         <div>ЛКМ - поставить блок</div>
         <div>ПКМ - сломать блок</div>
         <div>E - крафтинг</div>
         <div>ESC - пауза</div>
-        <div>1-9 - выбор слота</div>
       </div>
 
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-30">
